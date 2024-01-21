@@ -4,43 +4,56 @@ from random import randint
 from graphviz import Digraph
 
 
-def select_label(examples, example_goals, labels):
+def boolean_entropy(q):
+    b = 0
+    if q != 0:
+        b += q * log2(q)
+    if (1 - q) != 0:
+        b += (1 - q) * log2(1 - q)
+    return -b
+
+
+def entropy(vP: list):
+    e = 0
+    for p in vP:
+        e += (p * log2(p)) if p != 0 else 0
+    return -e
+
+
+def select_label(examples, example_goals, labels, classifications):
     """
     Returns the attrib index with most importance
     """
-
-    n = sum([1 for x in example_goals if x == 0])
-    p = sum([1 for x in example_goals if x == 1])
-
-    def boolean_entropy(q):
-
-        b = 0
-        if q != 0:
-            b += q * log2(q)
-        if (1 - q) != 0:
-            b += (1 - q) * log2(1 - q)
-        return -b
+    C = len(example_goals)
+    # probability of each classifications occurance in example_goals
+    pC = [
+        sum([1 for x in example_goals if x == c]) / C for c in classifications
+    ]
 
     def remainder(label):
         r = 0
 
         for d in label.values:
-            nk = sum([
-                1 for idx, x in enumerate(examples)
-                if example_goals[idx] == 0 and x[label.id] == d
-            ])
+            # count of examples
+            # whose label has the d'th value of label's values
+            C_a_k = sum([1 for x in examples if x[label.id] == d])
+            if C_a_k == 0:
+                continue
+            # probability of each classification by the d'th value of label
+            pC_a = []
+            for c in classifications:
+                p = sum([
+                    1 for idx, x in enumerate(examples)
+                    if example_goals[idx] == c and x[label.id] == d
+                ]) / C_a_k
+                pC_a.append(p)
 
-            pk = sum([
-                1 for idx, x in enumerate(examples)
-                if example_goals[idx] == 1 and x[label.id] == d
-            ])
+            r += (C_a_k / C) * entropy(pC_a)
 
-            if pk + nk != 0:
-                r += ((pk + nk) / (n + p)) * boolean_entropy(pk / (pk + nk))
         return r
 
     def gain(label):
-        return boolean_entropy(p / (p + n)) - remainder(label)
+        return entropy(pC) - remainder(label)
 
     return max(
         [(label, gain(label)) for label in labels],
@@ -61,17 +74,22 @@ def seperate_examples(examples) -> (list, list):
             for ex in examples], [ex[len(ex) - 1] for ex in examples]
 
 
-def plurality_value(goals):
+def plurality_value(goals, classifications):
     from dt import DecisionLeafNode
-    no = sum([1 for x in goals if x == 0])
-    yes = sum([1 for x in goals if x == 1])
-    if no > yes:
-        return DecisionLeafNode(0)
-    elif yes > no:
-        return DecisionLeafNode(1)
-    else:
-        # break ties
-        return DecisionLeafNode(randint(0, 1))
+    max_class = goals[0]
+    count = 0
+    for classification in classifications:
+        c = sum([1 for x in goals if x == classification])
+        if c > count:
+            count = c
+            max_class = classification
+        elif c == count:
+            # break ties
+            i = randint(0, 1)
+            count = [count, c][i]
+            max_class = [max_class, classification][i]
+
+    return DecisionLeafNode(max_class)
 
 
 def create_decision_tree_graph(node, dot=None):
@@ -79,11 +97,10 @@ def create_decision_tree_graph(node, dot=None):
     if dot is None:
         dot = Digraph(comment='Decision Tree')
 
-    if isinstance(node, type(DecisionLeafNode(0))):
-        print("leaf node drawn")
+    if isinstance(node, DecisionLeafNode):
         dot.node(str(node), label=str(node.value))
     else:
-        dot.node(str(node), label=str(node.label))
+        dot.node(str(node), label=str(node.label.label))
         if node.children is not None:
             for decision, child_node in node.children.items():
                 dot.edge(str(node), str(child_node), label=str(decision))

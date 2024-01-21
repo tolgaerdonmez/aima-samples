@@ -1,7 +1,6 @@
 import csv
 
 from dt import Label, DecisionTreeLearner
-import dt_utils
 
 data = None
 with open(
@@ -14,8 +13,6 @@ with open(
 
 raw_labels = data[0]
 examples = data[1:]
-for e in examples:
-    e[len(e) - 1] = 1 if e[len(e) - 1] == 'Yes' else 0
 
 labels = []
 for i in range(len(raw_labels) - 1):
@@ -27,9 +24,9 @@ for i in range(len(raw_labels) - 1):
         ))
 
 print("Training...")
-tree = DecisionTreeLearner(labels, examples).train()
+dt_learner = DecisionTreeLearner(labels, examples)
+dt_learner.train()
+
 print("Complete.")
 
-dt_utils.create_decision_tree_graph(tree).render('trained_tree',
-                                                 format="png",
-                                                 cleanup=True)
+dt_learner.export_image("trained_restaurant_tree")

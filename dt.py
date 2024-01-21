@@ -1,3 +1,4 @@
+import pickle
 from dataclasses import dataclass
 
 import dt_utils
@@ -24,7 +25,7 @@ class DecisionLeafNode:
 
 class DecisionTreeNode:
 
-    def __init__(self, label, children):
+    def __init__(self, label: Label, children):
         self.label = label
         self.children = children
 
@@ -34,9 +35,12 @@ class DecisionTreeLearner:
     def __init__(self, labels: [Label], examples):
         self.labels = labels
         self.examples = examples
+        self.classifications = list(
+            set(dt_utils.seperate_examples(examples)[1]))
+        self.tree = None
 
     def train(self):
-        return self.__train(self.examples, self.examples, self.labels)
+        self.tree = self.__train(self.examples, self.examples, self.labels)
 
     def __train(
         self,
@@ -48,15 +52,17 @@ class DecisionTreeLearner:
 
         if len(examples_to_learn) == 0:
             return dt_utils.plurality_value(
-                dt_utils.seperate_examples(parent_examples_to_learn)[1])
+                dt_utils.seperate_examples(parent_examples_to_learn)[1],
+                self.classifications)
         elif dt_utils.have_same_classification(goals):
-            return dt_utils.plurality_value(goals)
+            return dt_utils.plurality_value(goals, self.classifications)
         elif len(labels_to_match) == 0:
-            return dt_utils.plurality_value(goals)
+            return dt_utils.plurality_value(goals, self.classifications)
 
         selected_label = dt_utils.select_label(examples, goals,
-                                               labels_to_match)
-        node = DecisionTreeNode(selected_label.label, {})
+                                               labels_to_match,
+                                               self.classifications)
+        node = DecisionTreeNode(selected_label, {})
         labels = [
             label for label in labels_to_match if label.id != selected_label.id
         ]
@@ -74,3 +80,51 @@ class DecisionTreeLearner:
             node.children[v] = child_node
 
         return node
+
+    def decide(self, x: list | dict):
+        """
+            x: list of attributes values in matching
+               order of trained examples |
+               dict of attributes values each key
+               corresponding the trained example's label index
+
+            Looks up the decision tree to decide on classification
+
+            returns classification
+        """
+        curr = self.tree
+        while (not isinstance(curr, DecisionLeafNode)):
+            decision = x[curr.label.id]
+            # move among the tree by each label test
+            curr = curr.children[decision]
+
+        return curr.value
+
+    def test(self, examples):
+        pass
+
+    def export_to(self, filename):
+        with open(filename, "w", encoding="utf-8") as f:
+            pickle.dump(self, f)
+
+    def export_image(self, filename, format="png"):
+        if self.tree is None:
+            print("No tree to export")
+            return
+
+        dt_utils.create_decision_tree_graph(self.tree).render(
+            filename,
+            format=format,
+            cleanup=True,
+        )
+        print(f"Successfully exported tree as {format}")
+
+    @staticmethod
+    def import_from(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            obj = pickle.load(f)
+            if isinstance(obj, DecisionTreeLearner):
+                return obj
+            else:
+                raise Exception(
+                    "given file is not a valid DecisionTreeLearner")
