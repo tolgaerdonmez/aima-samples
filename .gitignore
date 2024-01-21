@@ -1,3 +1,4 @@
 aima-data
 .idea
 __pycache__
+*.dt

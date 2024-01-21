@@ -1,14 +1,14 @@
 import pickle
-from dataclasses import dataclass
 
 import dt_utils
 
 
-@dataclass()
 class Label:
-    id: int
-    label: str | bool | int
-    values: list
+
+    def __init__(self, id: int, label, values: list):
+        self.id = id
+        self.label = label
+        self.values = values
 
 
 class DecisionLeafNode:
@@ -100,12 +100,21 @@ class DecisionTreeLearner:
 
         return curr.value
 
-    def test(self, examples):
-        pass
+    def test(self, test_examples):
+        """
+            Returns the accuracy of the
+            trained tree tried on given test_examples
+            a value from interval [0,1]
+        """
+        (examples, goals) = dt_utils.seperate_examples(test_examples)
+        accuracy = sum([
+            1 for idx, x in enumerate(examples) if self.decide(x) == goals[idx]
+        ]) / len(examples)
+        return accuracy
 
     def export_to(self, filename):
-        with open(filename, "w", encoding="utf-8") as f:
-            pickle.dump(self, f)
+        with open(filename, "wb") as f:
+            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def export_image(self, filename, format="png"):
         if self.tree is None:
@@ -121,7 +130,7 @@ class DecisionTreeLearner:
 
     @staticmethod
     def import_from(filename):
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(filename, "rb") as f:
             obj = pickle.load(f)
             if isinstance(obj, DecisionTreeLearner):
                 return obj

@@ -30,3 +30,4 @@ dt_learner.train()
 print("Complete.")
 
 dt_learner.export_image("trained_restaurant_tree")
+dt_learner.export_to("restaurant.dt")
